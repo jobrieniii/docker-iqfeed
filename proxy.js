@@ -1,15 +1,13 @@
-/*
-   Proxies connections to IQFeed.
-   Holds connection to IQFeed to prevent it from shutting down.
-*/
 var
 	net = require('net'),
 	fs = require('fs');
 
 var portMap = {
-	5009: 5010,
-	9100: 9101,
-	9300: 9301
+    LEVEL1      : {  port1 : 5009, port2 : 5010},
+    LEVEL2      : {  port1 : 9200, port2 : 9201},
+    LOOKUP      : {  port1 : 9100, port2 : 9101},
+    ADMIN       : {  port1 : 9300, port2 : 9301},
+    DERIVATIVE  : {  port1 : 9400, port2 : 9401}
 };
 
 var config = {
@@ -19,47 +17,63 @@ var config = {
 	password: process.env.PASSWORD
 };
 
-Object.keys(portMap).forEach(function(port) {
+Object.keys(portMap).forEach(function(portKey) {
+
 	net.createServer(function(socket) {
+
 		var beforeConnectedBuffer = "";
 		var connected = false;
-		var connection = net.createConnection(port);
+        var connection = net.createConnection(portMap[portKey]['port1']);
+        
 		socket.on('close', function() {
 			connection.destroy();
-		});
+        });
+        
 		socket.on('error', function(err) {
 			console.error(err);
-		});
+        });
+        
 		socket.on('data', function(data) {
 			if (connected) {
-				connection.write(data);
+                connection.write(data);
+                console.log(`${portKey}|WRITE|${data}`);
 			} else {
 				beforeConnectedBuffer += data.toString();
 			}
-		});
+        });
+        
 		connection.on('connect', function() {
 			connected = true;
 			connection.write(beforeConnectedBuffer);
-		});
+        });
+
+        connection.on('data', function(data) {
+            console.log(data.toString ? `${portKey}|` + data.toString().replace(/[\r\n]+/, '') : data);
+            
+        });
+        
 		connection.on('error', function(err) {
 			console.error(err);
 			connection.unpipe(socket);
 			connection.destroy();
 			socket.end();
-		});
-		connection.pipe(socket);
-	}).listen(portMap[port]);
+        });
+        
+        connection.pipe(socket);
+        
+    }).listen(portMap[portKey]['port2']);
+
+ 
+    
 });
 
-/*
-We need to connect IQFeed to servers by passing 'connect' command to it.
-*/
 function startIqFeed() {
 	var port = 9300; // IQFeed admin port
 
 	console.log("Connecting to port ", port);
 
-	var socket = net.createConnection(port);
+    var socket = net.createConnection(port);
+    
 	socket.on('error', function(err) {
 	});
 	socket.on('close', function() {
@@ -80,7 +94,9 @@ function startIqFeed() {
                     console.log("Sending 'connect' command.");
                     socket.write("S,CONNECT\r\n");
                 }
-		console.log(data.toString ? data.toString().replace(/[\r\n]+/, '') : data);
+        
+        
+		console.log(data.toString ? `${port}|` + data.toString().replace(/[\r\n]+/, '') : data);
 	});
 }
 startIqFeed();

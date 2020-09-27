@@ -1,5 +1,5 @@
 WINE_ROOT=wine-root
-RELEASE=5.1.1.0
+RELEASE=6.1.0.20
 INSTALLER="iqfeed_client_$(shell echo $(RELEASE) | sed 's/\./_/g').exe"
 DEB=iqfeed-$(RELEASE)_amd64.deb
 
